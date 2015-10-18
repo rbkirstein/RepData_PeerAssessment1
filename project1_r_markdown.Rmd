@@ -1,0 +1,110 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    keep_md: true
+---
+```{r, echo=TRUE, results='asis'}
+library(dplyr)
+library(plyr)
+library(reshape2)
+library(nlme)
+library(ggplot2)
+```
+## Loading and preprocessing the data
+```{r, echo=TRUE, results='asis'}
+outcome <- read.csv("activity.csv", colClasses = "character")
+head(outcome)
+str(outcome)
+```
+
+### Tidy up the data
+```{r, echo=TRUE, results='asis'}
+outcome$date <- as.Date(outcome$date)
+outcome$day <- weekdays(outcome$date)
+outcome$steps <- as.numeric(outcome$steps)
+str(outcome)
+```
+## What is mean total number of steps taken per day?
+```{r, echo=TRUE, results='asis'}
+outcome_sum <- outcome %>%
+        group_by(day) %>%
+        summarise_each(funs(sum(steps, na.rm =TRUE)))
+outcome_sum
+```
+## plot sum of steps by days
+```{r, fig.show='hold'}
+hist(outcome_sum$steps, col = "blue", xlab = "steps", 
+     main = "Histogram of the sum of steps \ntaken each day of week")
+```
+
+```{r, echo=TRUE, results='asis'}
+mean_sum <- mean(outcome_sum$steps)
+mean_sum
+```
+## What is the average daily activity pattern?
+```{r, echo=TRUE, results='asis'}
+outcome_interval <- outcome %>%
+        group_by(interval) %>% 
+        summarise_each(funs(sum(steps, na.rm = TRUE)))
+str(outcome_interval)
+```
+
+```{r, fig.show='hold'}
+with(outcome_interval, plot(interval, steps, type="l", col = c("red"),
+                            main = "Number of steps per interval",
+                             ylab = "Average number of steps taken", xlab = "Intervals" ))
+```
+
+```{r, echo=TRUE, results='asis'}
+max_steps <- arrange(outcome_interval, desc(outcome_interval$steps))
+max_steps$interval[1]
+max_steps$steps[1]
+```
+## Imputing missing values
+```{r, echo=TRUE, results='asis'}
+outcome_interval_mean <- outcome %>%
+        group_by(interval) %>% 
+        summarise_each(funs(mean(steps, na.rm = TRUE)))
+str(outcome_interval_mean)
+outcome_bad <- is.na(outcome)
+str(outcome_bad)
+for(i in 0:60){
+        for(j in 1:288){
+                if(outcome_bad[j +(i*288),1] == TRUE){
+                        outcome$steps[ j +(i*288) ] <- outcome_interval_mean$steps[j]
+                        }
+        }
+}
+sum(is.na(outcome))
+outcome_sum2 <- outcome %>%
+        group_by(day) %>%
+        summarise_each(funs(sum(steps)))
+outcome_sum2
+```
+
+```{r, fig.show='hold'}
+hist(outcome_sum2$steps, col = "blue", xlab = "steps", 
+     main = "Histogram of the sum of steps \ntaken each day of week without NAs")
+```
+
+```{r, echo=TRUE, results='asis'}
+mean_sum2 <- mean(outcome_sum2$steps)
+mean_sum2
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE, results='asis'}
+weekdays1 <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+outcome$wDay <- factor((outcome$day %in% weekdays1), 
+                   levels=c(FALSE, TRUE), labels=c('weekend', 'weekday'))
+```
+
+```{r, fig.show='hold'}
+q <- qplot(interval, steps, data = outcome, type = "1")
+q + facet_grid(wDay ~ .)
+print(q)
+```
+
+There is an increase in activity during the week.
